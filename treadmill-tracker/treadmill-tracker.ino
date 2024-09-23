@@ -1,73 +1,89 @@
+#include "credentials.h"
 #include <Arduino.h>
+#include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiMulti.h>
-#include <HTTPClient.h>
 #include <stdio.h>
 #include <time.h>
-#include "credentials.h"
 
-
+// debug output
 #define USE_SERIAL Serial
-#define LED_BUILTIN 2
-#define SENSOR_HOT_PIN  23
-#define SENSOR_COLD_PIN  22
-#define JST 9 * 3600
 
+// pin assign
+#define LED_BUILTIN 2
+#define SENSOR_HOT_PIN 23
+#define SENSOR_COLD_PIN 22
+
+// constants
+#define JST 9 * 3600
 #define PHASE_OPEN 0
 #define PHASE_HIGH 1
 #define PHASE_LOW 2
 #define PHASE_HIT 3
-
 #define REFRACTORY_PERIOD 1
 #define OPEN_REFRACTORY_PERIOD 10
+#define MILLIMETER_PAR_STEP 134.0 // 670mm / 5step
 
+// wifi struct
 WiFiMulti wifiMulti;
 
-const float distanceParStep = 670.0 / 5.0;  // 5 step, 670 mm
-
+// variables
 unsigned long prevTimeHigh = 0;
 unsigned long prevTimeLow = 0;
 unsigned long prevTimeHit = 0;
 unsigned long intervalTime = 0;
 unsigned long hits = 0;
-
 unsigned int phase = 0;
 unsigned int prevSensor = HIGH;
 
+/*
+ * GPIO change handler
+ */
 void IRAM_ATTR handleInterrupt() {
+
+  // read sensor signal
   int sensor = digitalRead(SENSOR_COLD_PIN);
+
+  // indicate sensor status to builtin led
   digitalWrite(LED_BUILTIN, !sensor);
 
+  // get current time
   unsigned long currentTime = millis();
 
+  // phase progression
   if (phase == PHASE_OPEN) {
-    if (prevSensor == LOW && sensor == HIGH && (currentTime - prevTimeHit) >= OPEN_REFRACTORY_PERIOD) {
+    if (prevSensor == LOW && sensor == HIGH &&
+        (currentTime - prevTimeHit) >= OPEN_REFRACTORY_PERIOD) {
       prevTimeHigh = currentTime;
       phase = PHASE_HIGH;
     }
   } else if (phase == PHASE_HIGH) {
-    if (prevSensor == HIGH && sensor == LOW && (currentTime - prevTimeHigh) >= REFRACTORY_PERIOD) {
+    if (prevSensor == HIGH && sensor == LOW &&
+        (currentTime - prevTimeHigh) >= REFRACTORY_PERIOD) {
       prevTimeLow = currentTime;
       phase = PHASE_LOW;
     }
   } else if (phase == PHASE_LOW) {
-    if (prevSensor == LOW && sensor == HIGH && (currentTime - prevTimeLow) >= REFRACTORY_PERIOD) {
+    if (prevSensor == LOW && sensor == HIGH &&
+        (currentTime - prevTimeLow) >= REFRACTORY_PERIOD) {
       intervalTime = currentTime - prevTimeHit;
       prevTimeHit = currentTime;
       phase = PHASE_HIT;
       hits++;
     }
   } else if (phase == PHASE_HIT) {
-    if (prevSensor == HIGH && sensor == LOW && (currentTime - prevTimeHit) >= REFRACTORY_PERIOD) {
+    if (prevSensor == HIGH && sensor == LOW &&
+        (currentTime - prevTimeHit) >= REFRACTORY_PERIOD) {
       phase = PHASE_OPEN;
     }
   }
+
+  // save current sensor signal
   prevSensor = sensor;
 }
 
-
-
-void buildMessage(char* buf, float distance) {
+// build http post message
+void buildMessage(char *buf, float distance) {
   time_t ts;
   ts = time(NULL);
   USE_SERIAL.printf("[SENSOR] ts=%d\n", ts);
@@ -75,13 +91,14 @@ void buildMessage(char* buf, float distance) {
   sprintf(buf, "{\"esp32\":{\"ts\":%d,\"distance\":%f}}", ts, distance);
 }
 
-void postHttp(const char* url, const char* data) {
+// post message with HTTPS or HTTP
+void postHttp(const char *url, const char *data) {
   HTTPClient http;
 
   USE_SERIAL.print("[HTTP] begin...\n");
 
-  http.begin(url);  //HTTP
-  http.setAuthorization(AUTH_USER, AUTH_PASS);
+  http.begin(url);                             // HTTP or HTTPS
+  http.setAuthorization(AUTH_USER, AUTH_PASS); // basic auth
 
   USE_SERIAL.print("[HTTP] POST...\n");
   USE_SERIAL.print(data);
@@ -98,12 +115,14 @@ void postHttp(const char* url, const char* data) {
       USE_SERIAL.println(payload);
     }
   } else {
-    USE_SERIAL.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    USE_SERIAL.printf("[HTTP] POST... failed, error: %s\n",
+                      http.errorToString(httpCode).c_str());
   }
 
   http.end();
 }
 
+// setup device gpio, wifi, variables
 void setup() {
   // init serial
   USE_SERIAL.begin(115200);
@@ -145,17 +164,19 @@ void setup() {
   delay(OPEN_REFRACTORY_PERIOD);
 
   // start sensor intterupt
-  attachInterrupt(digitalPinToInterrupt(SENSOR_COLD_PIN), handleInterrupt, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_COLD_PIN), handleInterrupt,
+                  CHANGE);
 }
 
-
 void loop() {
-  if ((wifiMulti.run() == WL_CONNECTED)) {
+  // message buffer
+  char buf[100];
 
-    char buf[100];
+  if ((wifiMulti.run() == WL_CONNECTED)) {
+    // wifi connected
 
     // calc distance. hits is global variable.
-    float cumsumDistanceMeter = distanceParStep * hits / 1000.0;
+    float cumsumDistanceMeter = MILLIMETER_PAR_STEP * hits / 1000.0;
 
     // debug output
     USE_SERIAL.print("[SENSOR] cumsumDistanceMeter=");
