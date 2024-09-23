@@ -61,4 +61,4 @@ All rights, including copyright, are reserved by u-masao.
 
 ## GitHub Repository
 
-https://github.com/u-masao
+https://github.com/u-masao/esp32-treadmill-tracker

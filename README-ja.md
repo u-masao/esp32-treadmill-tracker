@@ -60,4 +60,4 @@
 
 ## GitHub リポジトリ
 
-https://github.com/u-masao
+https://github.com/u-masao/esp32-treadmill-tracker
