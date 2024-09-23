@@ -22,7 +22,7 @@
 #define PHASE_HIT 3
 #define REFRACTORY_PERIOD 1
 #define OPEN_REFRACTORY_PERIOD 10
-#define MILLIMETER_PAR_STEP 134.0 // 670mm / 5step
+#define MILLIMETER_PAR_STEP 134.0  // 670mm / 5step
 
 // wifi struct
 WiFiMulti wifiMulti;
@@ -52,28 +52,24 @@ void IRAM_ATTR handleInterrupt() {
 
   // phase progression
   if (phase == PHASE_OPEN) {
-    if (prevSensor == LOW && sensor == HIGH &&
-        (currentTime - prevTimeHit) >= OPEN_REFRACTORY_PERIOD) {
+    if (prevSensor == LOW && sensor == HIGH && (currentTime - prevTimeHit) >= OPEN_REFRACTORY_PERIOD) {
       prevTimeHigh = currentTime;
       phase = PHASE_HIGH;
     }
   } else if (phase == PHASE_HIGH) {
-    if (prevSensor == HIGH && sensor == LOW &&
-        (currentTime - prevTimeHigh) >= REFRACTORY_PERIOD) {
+    if (prevSensor == HIGH && sensor == LOW && (currentTime - prevTimeHigh) >= REFRACTORY_PERIOD) {
       prevTimeLow = currentTime;
       phase = PHASE_LOW;
     }
   } else if (phase == PHASE_LOW) {
-    if (prevSensor == LOW && sensor == HIGH &&
-        (currentTime - prevTimeLow) >= REFRACTORY_PERIOD) {
+    if (prevSensor == LOW && sensor == HIGH && (currentTime - prevTimeLow) >= REFRACTORY_PERIOD) {
       intervalTime = currentTime - prevTimeHit;
       prevTimeHit = currentTime;
       phase = PHASE_HIT;
       hits++;
     }
   } else if (phase == PHASE_HIT) {
-    if (prevSensor == HIGH && sensor == LOW &&
-        (currentTime - prevTimeHit) >= REFRACTORY_PERIOD) {
+    if (prevSensor == HIGH && sensor == LOW && (currentTime - prevTimeHit) >= REFRACTORY_PERIOD) {
       phase = PHASE_OPEN;
     }
   }
@@ -97,8 +93,8 @@ void postHttp(const char *url, const char *data) {
 
   USE_SERIAL.print("[HTTP] begin...\n");
 
-  http.begin(url);                             // HTTP or HTTPS
-  http.setAuthorization(AUTH_USER, AUTH_PASS); // basic auth
+  http.begin(url);                              // HTTP or HTTPS
+  http.setAuthorization(AUTH_USER, AUTH_PASS);  // basic auth
 
   USE_SERIAL.print("[HTTP] POST...\n");
   USE_SERIAL.print(data);
